@@ -45,12 +45,27 @@ What are the mean and median of the total number of steps?
 mean <- mean(totalperday$x)
 median <- median(totalperday$x)
 ```
-
 We can see that the median is `r sprintf("%.2f", median)` and the mean is `r sprintf("%.2f", mean)`
-
 
 ## What is the average daily activity pattern?
 
+The average daily pattern can be observed by plotting the average number of steps in each interval, average across all days:
+```{r averagesteps,echo=TRUE}
+library(dplyr)
+intervalsteps <- activity %>%
+  group_by(interval) %>%
+  summarise(avgsteps = mean(steps, na.rm=T))
+plot(intervalsteps$interval, intervalsteps$avgsteps,
+    type="l", main="Average daily pattern",
+    xlab="5 minute interval",
+    ylab="number of steps averaged across all days")
+```
+
+We can see there is a big increase in average steps at a certain interval - but which one?
+```{r echo=TRUE}
+maxsteps <- filter(intervalsteps, avgsteps == max(intervalsteps$avgsteps))
+```
+Now we can safely say the interval with highest number of steps is `r maxsteps$interval`
 
 
 ## Imputing missing values
