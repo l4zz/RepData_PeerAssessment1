@@ -34,18 +34,21 @@ cured <- activity[!is.na(activity$steps),]
 We now have two datasets, identical, one **with** NAs and the other **without**.
 
 ## What is mean total number of steps taken per day?
-Let us calculate the total number of steps taken per day, and plot it as an histogram
-```{r totalperdayhisto,echo=TRUE}
-totalperday <- aggregate(cured$steps, by=list(cured$date), FUN="sum", na.rm=T)
-hist(totalperday$x, xlab="Number of steps", main="Total number of steps taken each day")
+Let us calculate the total number of steps taken per day, and plot it as an histogram. We shall use a function in this instance, as we will want to reuse this calculation again
+```{r echo=TRUE}
+totaldaycalcs <- function(df) {
+  totalperday <- aggregate(df$steps, by=list(df$date), FUN="sum", na.rm=T)
+  hist(totalperday$x, xlab="Number of steps", main="Total number of steps taken each day")
+  list(mean = mean(totalperday$x), median = median(totalperday$x))
+}
 ```
 
-What are the mean and median of the total number of steps?
-```{r echo=TRUE}
-mean <- mean(totalperday$x)
-median <- median(totalperday$x)
+Now it can be used as such:
+```{r totalperdayhisto1,echo=TRUE}
+histocured <- totaldaycalcs(cured)
 ```
-We can see that the median is `r sprintf("%.2f", median)` and the mean is `r sprintf("%.2f", mean)`
+
+We can see that the median is `r histocured$median` and the mean is `r histocured$mean`
 
 ## What is the average daily activity pattern?
 
@@ -65,11 +68,61 @@ We can see there is a big increase in average steps at a certain interval - but 
 ```{r echo=TRUE}
 maxsteps <- filter(intervalsteps, avgsteps == max(intervalsteps$avgsteps))
 ```
+
 Now we can safely say the interval with highest number of steps is `r maxsteps$interval`
 
-
 ## Imputing missing values
+Calculating the number of rows with missing data (NAs)
+```{r howmanymissing,echo=TRUE}
+incompletes <- is.na(activity)
+length(activity[incompletes])
+```
+```{r echo=FALSE,results='hide'}
+howmany <- length(activity)
+howmanymissing <- length(activity[incompletes])
+```
 
+There are `r howmanymissing` rows out of `r howmany` with NAs.
 
+To fill in the NAs with the average steps for the corresponding interval, we can use the average calculated in 'intervalsteps' above:
+```{r echo=TRUE}
+newactivity = activity %>%
+  mutate(steps = replace(activity$steps, is.na(activity$steps), intervalsteps$avgsteps))
+```
+
+To create a histogram of the total steps taken each day, we can use the function defined above
+```{r totalperdayhisto2,echo=TRUE}
+histonewactivity <- totaldaycalcs(newactivity)
+```
+
+For the dataset with the filled in NAs, the mean is `r sprintf("%.2f", histonewactivity$mean)` (the previous value was `r sprintf("%.2f", histocured$mean)`) and the median is `r sprintf("%.2f", histonewactivity$median)` (previous was `r sprintf("%.2f", histocured$median)`. This seems to indicate the strategy followed has little impact on the data distribution.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+For this section, we will create an extra column to label the date as a weekend or weekday, and we will be using the dataset with the filled in NAs (from before)
+```{r echo=TRUE}
+newactivity$day <- weekdays(strptime(newactivity$date, "%Y-%m-%d", tz="UTC"))
+newactivity = newactivity %>%
+  mutate(day = ifelse((day == "Sunday" | day == "Saturday"),"weekend", "weekday"))
+```
+
+To generate the plots, we can use the base system, splitting the data generated above into two datasets
+```{r echo=TRUE}
+twogroup <- newactivity %>%
+  group_by(day, interval) %>%
+  summarise(avgsteps = mean(steps))
+weekdays <- twogroup[(twogroup$day == "weekday"),]
+weekend <- twogroup[(twogroup$day == "weekend"),]
+```
+
+```{r weeks,fig.height=5,fig.width=10,echo=TRUE}
+par(mfrow = c(2,1), oma=c(4,4,2,2), mar=c(0,1,0.5,1))
+# plotting weekends data
+plot(weekend$interval, weekend$avgsteps, type="l", xlab="", ylab="", xaxt='n', ann=FALSE)
+mtext("weekends", side=3, line=-1, adj=1)
+# plotting weekdays data
+plot(weekdays$interval, weekdays$avgsteps, type="l", xlab="", ylab="")
+# plot annotation
+mtext("weekdays", side=3, line=-1, adj=1)
+title(main="Average walking pattern",outer=TRUE,
+      xlab="5 minute interval", ylab="average number of steps",)
+```
